@@ -1,7 +1,11 @@
 package jnest;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.util.Map;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableMap;
 
 import ox.Json;
@@ -54,16 +58,15 @@ public class Thermostat extends Device {
   }
 
   private static ThermostatMode parseMode(String s) {
-    if (s.equals("cool")) {
-      return ThermostatMode.COOLING;
-    } else if (s.equals("heat")) {
-      return ThermostatMode.HEATING;
-    } else if (s.equals("range")) {
-      return ThermostatMode.RANGE;
-    } else if (s.equals("off")) {
-      return ThermostatMode.OFF;
-    } else {
-      throw new RuntimeException("Unhandled mode: " + s);
+    ThermostatMode ret = modeStrings.get(s);
+    checkNotNull(ret, "Unhandled mode: " + s);
+    return ret;
+  }
+
+  private static final BiMap<String, ThermostatMode> modeStrings = HashBiMap.create();
+  static {
+    for (ThermostatMode mode : ThermostatMode.values()) {
+      modeStrings.put(mode.getNestString(), mode);
     }
   }
 
@@ -73,6 +76,16 @@ public class Thermostat extends Device {
     @Override
     public String toString() {
       return name().toLowerCase();
+    }
+
+    public String getNestString() {
+      if (this == COOLING) {
+        return "cool";
+      } else if (this == HEATING) {
+        return "heat";
+      } else {
+        return name().toLowerCase();
+      }
     }
   }
 

@@ -9,6 +9,7 @@ import java.util.Map;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import jnest.Thermostat.ThermostatMode;
 import ox.HttpRequest;
 import ox.Json;
 import ox.Log;
@@ -29,14 +30,23 @@ public class NestClient {
 
   public void setTemperature(String thermostatSerialNumber, double degreesF) {
     Log.debug("Setting temperature of %s to %s", thermostatSerialNumber, degreesF);
+
+    putThermostatData(thermostatSerialNumber, "target_temperature", Thermostat.fToC(degreesF));
+
+  }
+
+  public void setMode(String thermostatSerialNumber, ThermostatMode mode) {
+    Log.debug("Setting mode of %s to %s", thermostatSerialNumber, mode);
+
+    putThermostatData(thermostatSerialNumber, "target_temperature_type", mode.getNestString());
+  }
+
+  private void putThermostatData(String thermostatSerialNumber, String key, Object value) {
     Json data = Json.object()
-        // .with("session", "")
         .with("objects", Json.array(Json.object()
-            // .with("base_object_revision", 123)
             .with("object_key", "shared." + thermostatSerialNumber)
             .with("op", "MERGE")
-            .with("value", Json.object()
-                .with("target_temperature", Thermostat.fToC(degreesF)))));
+            .with("value", Json.object().with(key, value))));
 
     Log.debug(data.prettyPrint());
 
@@ -56,7 +66,7 @@ public class NestClient {
             .with("known_bucket_versions", Json.array()))
         .checkStatus().toJson();
     // Log.debug(json.prettyPrint());
-//    Log.debug("========");
+    // Log.debug("========");
 
     transportUrl = json.getJson("service_urls").getJson("urls").get("transport_url");
 
