@@ -2,6 +2,8 @@ package jnest;
 
 import java.util.Map;
 
+import com.google.common.collect.ImmutableMap;
+
 import ox.Json;
 
 public class Thermostat extends Device {
@@ -14,6 +16,14 @@ public class Thermostat extends Device {
 
   public Thermostat(String serialNumber) {
     super(serialNumber);
+  }
+
+  public Map<String, Object> getData() {
+    return ImmutableMap.of("mode", mode,
+        "currentTemperature", currentTemperature,
+        "targetTemperatureLow", targetTemperatureLow,
+        "targetTemperature", targetTemperature,
+        "targetTemperatureHigh", targetTemperatureHigh);
   }
 
   public void update(Json data, Map<String, String> roomNames) {
@@ -59,6 +69,11 @@ public class Thermostat extends Device {
 
   public static enum ThermostatMode {
     OFF, COOLING, HEATING, RANGE, FAN;
+
+    @Override
+    public String toString() {
+      return name().toLowerCase();
+    }
   }
 
 }

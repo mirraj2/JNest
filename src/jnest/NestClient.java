@@ -15,31 +15,25 @@ import ox.Log;
 
 public class NestClient {
 
-  private final String issueTokenUrl, cookie;
   private String userId, accessToken;
   private String transportUrl;
 
-  public NestClient(String issueTokenUrl, String cookie) {
-    this.issueTokenUrl = issueTokenUrl;
-    this.cookie = cookie;
-  }
-
-  public NestClient login() {
-    Json info = getLoginInformation(getAccessToken());
-    Log.debug(info.prettyPrint());
+  public NestClient login(String issueTokenUrl, String cookie) {
+    Json info = getLoginInformation(getAccessToken(issueTokenUrl, cookie));
+    // Log.debug(info.prettyPrint());
     userId = info.getJson("claims").getJson("subject").getJson("nestId").get("id");
     accessToken = info.get("jwt");
-    Log.debug("Logged in!");
+    Log.debug("NestClient: Logged in!");
     return this;
   }
 
-  public void setTemperature(Thermostat thermostat, double degreesF) {
-    Log.debug("Setting temperature of %s to %s", thermostat, degreesF);
+  public void setTemperature(String thermostatSerialNumber, double degreesF) {
+    Log.debug("Setting temperature of %s to %s", thermostatSerialNumber, degreesF);
     Json data = Json.object()
         // .with("session", "")
         .with("objects", Json.array(Json.object()
             // .with("base_object_revision", 123)
-            .with("object_key", "shared." + thermostat.serialNumber)
+            .with("object_key", "shared." + thermostatSerialNumber)
             .with("op", "MERGE")
             .with("value", Json.object()
                 .with("target_temperature", Thermostat.fToC(degreesF)))));
@@ -62,7 +56,7 @@ public class NestClient {
             .with("known_bucket_versions", Json.array()))
         .checkStatus().toJson();
     // Log.debug(json.prettyPrint());
-    Log.debug("========");
+//    Log.debug("========");
 
     transportUrl = json.getJson("service_urls").getJson("urls").get("transport_url");
 
@@ -97,7 +91,7 @@ public class NestClient {
     return ret;
   }
 
-  private String getAccessToken() {
+  private String getAccessToken(String issueTokenUrl, String cookie) {
     Json json = HttpRequest.get(issueTokenUrl)
         .chromeAgent()
         .header("Sec-Fetch-Mode", "cors")
