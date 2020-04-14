@@ -1,0 +1,5 @@
+bin/
+.DS_Store
+*.jar
+.metadata/
+!**/lib/**/*.jar
