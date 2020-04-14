@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." default="build" name="JNest">
+    <property environment="env"/>
+    <property name="ox.location" value="../ox"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.8"/>
+    <property name="source" value="1.8"/>
+    <path id="ox.classpath">
+        <pathelement location="${ox.location}/bin"/>
+        <pathelement location="${ox.location}/lib/objenesis-2.1.jar"/>
+        <pathelement location="${ox.location}/lib/gson-2.8.2.jar"/>
+        <pathelement location="${ox.location}/lib/slf4j-api-1.7.2.jar"/>
+        <pathelement location="${ox.location}/lib/slf4j-simple-1.7.2.jar"/>
+        <pathelement location="${ox.location}/lib/guava-27.0.1-jre.jar"/>
+        <pathelement location="${ox.location}/lib/failureaccess-1.0.1.jar"/>
+    </path>
+    <path id="JNest.classpath">
+        <pathelement location="bin"/>
+        <path refid="ox.classpath"/>
+    </path>
+    <target name="init">
+        <mkdir dir="bin"/>
+        <copy includeemptydirs="false" todir="bin">
+            <fileset dir="src">
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy>
+    </target>
+    <target name="clean">
+        <delete dir="bin"/>
+    </target>
+    <target depends="clean" name="cleanall">
+        <ant antfile="build.xml" dir="${ox.location}" inheritAll="false" target="clean"/>
+    </target>
+    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="build-subprojects">
+        <ant antfile="build.xml" dir="${ox.location}" inheritAll="false" target="build-project"/>
+    </target>
+    <target depends="init" name="build-project">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac debug="true" debuglevel="${debuglevel}" destdir="bin" includeantruntime="false" source="${source}" target="${target}">
+            <src path="src"/>
+            <classpath refid="JNest.classpath"/>
+        </javac>
+    </target>
+</project>
