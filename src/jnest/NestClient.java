@@ -53,12 +53,11 @@ public class NestClient {
 
     Log.debug(data.prettyPrint());
 
-    String s = HttpRequest.post(transportUrl + "/v5/put")
+    HttpRequest.post(transportUrl + "/v5/put")
         .chromeAgent()
         .authorization("Basic " + accessToken)
         .header("X-nl-protocol-version", "1")
-        .send(data).checkStatus().getBody();
-    Log.debug(s);
+        .send(data).checkStatus();
   }
 
   public List<Device> getDevices() {
