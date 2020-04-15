@@ -1,8 +1,12 @@
 package jnest;
 
+import static ox.util.Utils.checkNotEmpty;
 import static ox.util.Utils.first;
+import static ox.util.Utils.normalize;
 import static ox.util.Utils.second;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -17,22 +21,19 @@ import ox.Log;
 public class NestClient {
 
   private String userId, accessToken;
+  private Instant lastAccessTokenRefresh = null;
   private String transportUrl;
+  private String issueTokenUrl, cookie;
 
-  public NestClient login(String issueTokenUrl, String cookie) {
-    Json info = getLoginInformation(getAccessToken(issueTokenUrl, cookie));
-    // Log.debug(info.prettyPrint());
-    userId = info.getJson("claims").getJson("subject").getJson("nestId").get("id");
-    accessToken = info.get("jwt");
-    Log.debug("NestClient: Logged in!");
-    return this;
+  public NestClient(String issueTokenUrl, String cookie) {
+    this.issueTokenUrl = checkNotEmpty(normalize(issueTokenUrl));
+    this.cookie = checkNotEmpty(normalize(cookie));
   }
 
   public void setTemperature(String thermostatSerialNumber, double degreesF) {
     Log.debug("Setting temperature of %s to %s", thermostatSerialNumber, degreesF);
 
     putThermostatData(thermostatSerialNumber, "target_temperature", Thermostat.fToC(degreesF));
-
   }
 
   public void setMode(String thermostatSerialNumber, ThermostatMode mode) {
@@ -42,6 +43,8 @@ public class NestClient {
   }
 
   private void putThermostatData(String thermostatSerialNumber, String key, Object value) {
+    ensureValidToken();
+
     Json data = Json.object()
         .with("objects", Json.array(Json.object()
             .with("object_key", "shared." + thermostatSerialNumber)
@@ -59,14 +62,14 @@ public class NestClient {
   }
 
   public List<Device> getDevices() {
+    ensureValidToken();
+
     Json json = HttpRequest.post("https://home.nest.com/api/0.1/user/" + userId + "/app_launch")
         .authorization("Basic " + accessToken)
         .send(Json.object()
             .with("known_bucket_types", Json.array("where", "device", "shared", "topaz"))
             .with("known_bucket_versions", Json.array()))
         .checkStatus().toJson();
-    // Log.debug(json.prettyPrint());
-    // Log.debug("========");
 
     transportUrl = json.getJson("service_urls").getJson("urls").get("transport_url");
 
@@ -99,6 +102,22 @@ public class NestClient {
     }
 
     return ret;
+  }
+
+  private synchronized void ensureValidToken() {
+    if (lastAccessTokenRefresh == null ||
+        ChronoUnit.MINUTES.between(lastAccessTokenRefresh, Instant.now()) >= 59) {
+      refreshAccessToken();
+    }
+  }
+
+  private synchronized void refreshAccessToken() {
+    Log.info("NestClient: Refreshing access token.");
+
+    Json info = getLoginInformation(getAccessToken(issueTokenUrl, cookie));
+    userId = info.getJson("claims").getJson("subject").getJson("nestId").get("id");
+    accessToken = info.get("jwt");
+    lastAccessTokenRefresh = Instant.now();
   }
 
   private String getAccessToken(String issueTokenUrl, String cookie) {
