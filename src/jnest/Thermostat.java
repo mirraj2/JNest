@@ -18,16 +18,23 @@ public class Thermostat extends Device {
 
   public String locationName;
 
+  public boolean isHeatOn, isCoolOn, isFanOn;
+
   public Thermostat(String serialNumber) {
     super(serialNumber);
   }
 
   public Map<String, Object> getData() {
-    return ImmutableMap.of("mode", mode,
-        "currentTemperature", currentTemperature,
-        "targetTemperatureLow", targetTemperatureLow,
-        "targetTemperature", targetTemperature,
-        "targetTemperatureHigh", targetTemperatureHigh);
+    return ImmutableMap.<String, Object>builder()
+        .put("mode", mode)
+        .put("currentTemperature", currentTemperature)
+        .put("targetTemperatureLow", targetTemperatureLow)
+        .put("targetTemperature", targetTemperature)
+        .put("targetTemperatureHigh", targetTemperatureHigh)
+        .put("isHeatOn", isHeatOn)
+        .put("isCoolOn", isCoolOn)
+        .put("isFanOn", isFanOn)
+        .build();
   }
 
   public void update(Json data, Map<String, String> roomNames) {
@@ -40,6 +47,9 @@ public class Thermostat extends Device {
     targetTemperatureLow = cToF(json.getDouble("target_temperature_low"));
     targetTemperature = cToF(json.getDouble("target_temperature"));
     targetTemperatureHigh = cToF(json.getDouble("target_temperature_high"));
+    isHeatOn = json.getBoolean("hvac_heater_state");
+    isCoolOn = json.getBoolean("hvac_ac_state");
+    isFanOn = json.getBoolean("hvac_fan_state");
   }
 
   @Override

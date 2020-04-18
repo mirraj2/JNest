@@ -104,6 +104,7 @@ public class NestClient {
     ensureValidToken();
 
     Json json = getDevicesJson();
+    // Log.debug(json.prettyPrint());
 
     Map<String, String> roomNames = Maps.newLinkedHashMap();
 
