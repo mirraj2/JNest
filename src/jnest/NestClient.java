@@ -1,6 +1,8 @@
 package jnest;
 
+import static com.google.common.base.Preconditions.checkState;
 import static ox.util.Functions.filter;
+import static ox.util.Functions.index;
 import static ox.util.Utils.checkNotEmpty;
 import static ox.util.Utils.first;
 import static ox.util.Utils.normalize;
@@ -13,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -21,6 +24,7 @@ import jnest.Thermostat.ThermostatMode;
 import ox.HttpRequest;
 import ox.Json;
 import ox.Log;
+import ox.Threads;
 
 public class NestClient {
 
@@ -103,13 +107,25 @@ public class NestClient {
   public List<Device> getDevices() {
     ensureValidToken();
 
-    Json json = getDevicesJson();
-    // Log.debug(json.prettyPrint());
-
     Map<String, String> roomNames = Maps.newLinkedHashMap();
+    Json transformed = transformBuckets(getDevicesJson().getJson("updated_buckets").asJsonArray(), roomNames);
 
+    List<Device> ret = Lists.newArrayList();
+    for (String serialNumber : transformed) {
+      Thermostat thermostat = new Thermostat(serialNumber);
+      Json json = transformed.getJson(serialNumber);
+      Json deviceJson = json.getJson("device");
+      deviceJson.with("where_name", roomNames.get(deviceJson.get("where_id")));
+      thermostat.update(json);
+      ret.add(thermostat);
+    }
+
+    return ret;
+  }
+
+  private Json transformBuckets(List<Json> buckets, Map<String, String> roomNames) {
     Json transformed = Json.object();
-    json.getJson("updated_buckets").asJsonArray().forEach(bucket -> {
+    buckets.forEach(bucket -> {
       String objectKey = bucket.get("object_key");
       if (objectKey.startsWith("shared") || objectKey.startsWith("device")) {
         String type = first(objectKey, ".");
@@ -118,23 +134,17 @@ public class NestClient {
         if (inner == null) {
           transformed.with(serialNumber, inner = Json.object());
         }
-        inner.with(type, bucket.getJson("value"));
+        Json values = bucket.getJson("value");
+        values.with("object_revision", bucket.getInt("object_revision"));
+        values.with("object_timestamp", bucket.getLong("object_timestamp"));
+        inner.with(type, values);
       } else if (objectKey.startsWith("where")) {
         bucket.getJson("value").getJson("wheres").asJsonArray().forEach(room -> {
           roomNames.put(room.get("where_id"), room.get("name"));
         });
       }
     });
-    // Log.debug(transformed.prettyPrint());
-
-    List<Device> ret = Lists.newArrayList();
-    for (String serialNumber : transformed) {
-      Thermostat thermostat = new Thermostat(serialNumber);
-      thermostat.update(transformed.getJson(serialNumber), roomNames);
-      ret.add(thermostat);
-    }
-
-    return ret;
+    return transformed;
   }
 
   private Json getDevicesJson() {
@@ -144,6 +154,50 @@ public class NestClient {
             .with("known_bucket_types", Json.array("where", "device", "shared", "topaz"))
             .with("known_bucket_versions", Json.array()))
         .checkStatus().toJson();
+  }
+
+  /**
+   * Listens for changes on the given devices. For example, when device B's target_temperature changes, the callback
+   * will be invoked.
+   */
+  public void listenForChanges(List<Device> devices, Consumer<Device> callback) {
+    final Map<String, Device> serialNumberDevices = index(devices, d -> d.serialNumber);
+
+    Threads.run(() -> {
+      while (true) {
+        Json body = Json.object().with("objects", createBuckets(devices));
+        Json response = HttpRequest.post(transportUrl + "/v5/subscribe")
+            .chromeAgent()
+            .authorization("Basic " + accessToken)
+            .header("X-nl-user-id", this.userId)
+            .header("X-nl-protocol-version", "1")
+            .send(body).checkStatus().toJson();
+        List<Json> objects = response.getJson("objects").asJsonArray();
+        checkState(!objects.isEmpty());
+        Json transformed = transformBuckets(objects, null);
+        Log.debug("NestClient: Got thermostat changes from /subscribe");
+        for (String key : transformed) {
+          Device device = serialNumberDevices.get(key);
+          device.update(transformed.getJson(key));
+          callback.accept(device);
+        }
+      }
+    });
+  }
+
+  private Json createBuckets(List<Device> devices) {
+    Json buckets = Json.array();
+    devices.forEach(d -> {
+      buckets.add(Json.object()
+          .with("object_key", "device." + d.serialNumber)
+          .with("object_revision", d.deviceRevisionNumber)
+          .with("object_timestamp", d.deviceTimestamp.toEpochMilli()));
+      buckets.add(Json.object()
+          .with("object_key", "shared." + d.serialNumber)
+          .with("object_revision", d.sharedRevisionNumber)
+          .with("object_timestamp", d.sharedTimestamp.toEpochMilli()));
+    });
+    return buckets;
   }
 
   private synchronized void ensureValidToken() {
@@ -192,5 +246,5 @@ public class NestClient {
         .send("")
         .checkStatus().toJson();
   }
-  
+
 }

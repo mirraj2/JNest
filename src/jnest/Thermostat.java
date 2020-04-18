@@ -37,19 +37,28 @@ public class Thermostat extends Device {
         .build();
   }
 
-  public void update(Json data, Map<String, String> roomNames) {
-    Json json = data.getJson("device");
-    locationName = roomNames.get(json.get("where_id"));
+  @Override
+  public void update(Json data) {
+    super.update(data);
 
-    json = data.getJson("shared");
-    mode = parseMode(json.get("target_temperature_type"));
-    currentTemperature = cToF(json.getDouble("current_temperature"));
-    targetTemperatureLow = cToF(json.getDouble("target_temperature_low"));
-    targetTemperature = cToF(json.getDouble("target_temperature"));
-    targetTemperatureHigh = cToF(json.getDouble("target_temperature_high"));
-    isHeatOn = json.getBoolean("hvac_heater_state");
-    isCoolOn = json.getBoolean("hvac_ac_state");
-    isFanOn = json.getBoolean("hvac_fan_state");
+    if (data.hasKey("device")) {
+      Json json = data.getJson("device");
+      if (json.hasKey("where_name")) {
+        locationName = json.get("where_name");
+      }
+    }
+
+    if (data.hasKey("shared")) {
+      Json json = data.getJson("shared");
+      mode = parseMode(json.get("target_temperature_type"));
+      currentTemperature = cToF(json.getDouble("current_temperature"));
+      targetTemperatureLow = cToF(json.getDouble("target_temperature_low"));
+      targetTemperature = cToF(json.getDouble("target_temperature"));
+      targetTemperatureHigh = cToF(json.getDouble("target_temperature_high"));
+      isHeatOn = json.getBoolean("hvac_heater_state");
+      isCoolOn = json.getBoolean("hvac_ac_state");
+      isFanOn = json.getBoolean("hvac_fan_state");
+    }
   }
 
   @Override
