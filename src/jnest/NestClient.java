@@ -1,14 +1,18 @@
 package jnest;
 
+import static ox.util.Functions.filter;
 import static ox.util.Utils.checkNotEmpty;
 import static ox.util.Utils.first;
 import static ox.util.Utils.normalize;
+import static ox.util.Utils.only;
 import static ox.util.Utils.second;
+import static ox.util.Utils.sleep;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -33,23 +37,55 @@ public class NestClient {
   public void setTemperature(String thermostatSerialNumber, double degreesF) {
     Log.debug("Setting temperature of %s to %s", thermostatSerialNumber, degreesF);
 
-    putThermostatData(thermostatSerialNumber, "target_temperature", Thermostat.fToC(degreesF));
+    putThermostatData(thermostatSerialNumber, Json.object().with("target_temperature", Thermostat.fToC(degreesF)));
+  }
+
+  public void setTemperature(String thermostatSerialNumber, ThermostatMode mode, double degreesF) {
+    Thermostat thermostat = (Thermostat) getDevice(thermostatSerialNumber);
+    if (thermostat.mode == mode) {
+      setTemperature(thermostatSerialNumber, degreesF);
+      return;
+    }
+
+    double previousTarget = thermostat.targetTemperature;
+    setMode(thermostatSerialNumber, mode);
+
+    for (int i = 30; i >= 0; i--) {
+      thermostat = (Thermostat) getDevice(thermostatSerialNumber);
+      if (thermostat.targetTemperature != previousTarget) {
+        break;
+      }
+      sleep(1000);
+      if (i == 0) {
+        Log.warn("Thermostat mode change not detected!");
+      } else {
+        Log.warn("mode not yet changed.");
+        sleep(1000);
+      }
+    }
+
+    setTemperature(thermostatSerialNumber, degreesF);
+
+    // Json value = Json.object()
+    // .with("target_temperature", Thermostat.fToC(degreesF))
+    // .with("target_temperature_type", mode.getNestString());
+    // putThermostatData(thermostatSerialNumber, value);
   }
 
   public void setMode(String thermostatSerialNumber, ThermostatMode mode) {
     Log.debug("Setting mode of %s to %s", thermostatSerialNumber, mode);
 
-    putThermostatData(thermostatSerialNumber, "target_temperature_type", mode.getNestString());
+    putThermostatData(thermostatSerialNumber, Json.object().with("target_temperature_type", mode.getNestString()));
   }
 
-  private void putThermostatData(String thermostatSerialNumber, String key, Object value) {
+  private void putThermostatData(String thermostatSerialNumber, Json value) {
     ensureValidToken();
 
     Json data = Json.object()
         .with("objects", Json.array(Json.object()
             .with("object_key", "shared." + thermostatSerialNumber)
             .with("op", "MERGE")
-            .with("value", Json.object().with(key, value))));
+            .with("value", value)));
 
     Log.debug(data.prettyPrint());
 
@@ -60,17 +96,14 @@ public class NestClient {
         .send(data).checkStatus();
   }
 
+  public Device getDevice(String serialNumber) {
+    return only(filter(getDevices(), d -> Objects.equals(d.serialNumber, serialNumber)));
+  }
+
   public List<Device> getDevices() {
     ensureValidToken();
 
-    Json json = HttpRequest.post("https://home.nest.com/api/0.1/user/" + userId + "/app_launch")
-        .authorization("Basic " + accessToken)
-        .send(Json.object()
-            .with("known_bucket_types", Json.array("where", "device", "shared", "topaz"))
-            .with("known_bucket_versions", Json.array()))
-        .checkStatus().toJson();
-
-    transportUrl = json.getJson("service_urls").getJson("urls").get("transport_url");
+    Json json = getDevicesJson();
 
     Map<String, String> roomNames = Maps.newLinkedHashMap();
 
@@ -103,10 +136,22 @@ public class NestClient {
     return ret;
   }
 
+  private Json getDevicesJson() {
+    return HttpRequest.post("https://home.nest.com/api/0.1/user/" + userId + "/app_launch")
+        .authorization("Basic " + accessToken)
+        .send(Json.object()
+            .with("known_bucket_types", Json.array("where", "device", "shared", "topaz"))
+            .with("known_bucket_versions", Json.array()))
+        .checkStatus().toJson();
+  }
+
   private synchronized void ensureValidToken() {
     if (lastAccessTokenRefresh == null ||
         ChronoUnit.MINUTES.between(lastAccessTokenRefresh, Instant.now()) >= 59) {
       refreshAccessToken();
+    }
+    if (transportUrl == null) {
+      transportUrl = getDevicesJson().getJson("service_urls").getJson("urls").get("transport_url");
     }
   }
 
@@ -146,5 +191,5 @@ public class NestClient {
         .send("")
         .checkStatus().toJson();
   }
-
+  
 }
