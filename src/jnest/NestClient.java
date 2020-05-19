@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import jnest.Thermostat.ThermostatMode;
+import jnest.NestThermostat.ThermostatMode;
 import ox.HttpRequest;
 import ox.Json;
 import ox.Log;
@@ -41,11 +41,11 @@ public class NestClient {
   public void setTemperature(String thermostatSerialNumber, double degreesF) {
     Log.debug("Setting temperature of %s to %s", thermostatSerialNumber, degreesF);
 
-    putThermostatData(thermostatSerialNumber, Json.object().with("target_temperature", Thermostat.fToC(degreesF)));
+    putThermostatData(thermostatSerialNumber, Json.object().with("target_temperature", NestThermostat.fToC(degreesF)));
   }
 
   public void setTemperature(String thermostatSerialNumber, ThermostatMode mode, double degreesF) {
-    Thermostat thermostat = (Thermostat) getDevice(thermostatSerialNumber);
+    NestThermostat thermostat = (NestThermostat) getDevice(thermostatSerialNumber);
     if (thermostat.mode == mode) {
       setTemperature(thermostatSerialNumber, degreesF);
       return;
@@ -55,7 +55,7 @@ public class NestClient {
     setMode(thermostatSerialNumber, mode);
 
     for (int i = 30; i >= 0; i--) {
-      thermostat = (Thermostat) getDevice(thermostatSerialNumber);
+      thermostat = (NestThermostat) getDevice(thermostatSerialNumber);
       if (thermostat.targetTemperature != previousTarget) {
         break;
       }
@@ -112,7 +112,7 @@ public class NestClient {
 
     List<Device> ret = Lists.newArrayList();
     for (String serialNumber : transformed) {
-      Thermostat thermostat = new Thermostat(serialNumber);
+      NestThermostat thermostat = new NestThermostat(serialNumber);
       Json json = transformed.getJson(serialNumber);
       Json deviceJson = json.getJson("device");
       deviceJson.with("where_name", roomNames.get(deviceJson.get("where_id")));

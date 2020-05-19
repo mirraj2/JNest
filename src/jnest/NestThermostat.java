@@ -10,7 +10,7 @@ import com.google.common.collect.ImmutableMap;
 
 import ox.Json;
 
-public class Thermostat extends Device {
+public class NestThermostat extends Device {
 
   public ThermostatMode mode;
 
@@ -20,10 +20,11 @@ public class Thermostat extends Device {
 
   public boolean isHeatOn, isCoolOn, isFanOn;
 
-  public Thermostat(String serialNumber) {
+  public NestThermostat(String serialNumber) {
     super(serialNumber);
   }
 
+  @Override
   public Map<String, Object> getData() {
     return ImmutableMap.<String, Object>builder()
         .put("mode", mode)
@@ -63,7 +64,8 @@ public class Thermostat extends Device {
 
   @Override
   public String toString() {
-    return "Thermostat [serialNumber=" + serialNumber + ", mode=" + mode + ", currentTemperature=" + currentTemperature
+    return "NestThermostat [serialNumber=" + serialNumber + ", mode=" + mode + ", currentTemperature="
+        + currentTemperature
         + ", targetTemperatureLow=" + targetTemperatureLow + ", targetTemperature=" + targetTemperature
         + ", targetTemperatureHigh=" + targetTemperatureHigh + ", locationName=" + locationName + "]";
   }
