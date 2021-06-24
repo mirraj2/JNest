@@ -226,6 +226,10 @@ public class NestClient {
         .header("X-Requested-With", "XmlHttpRequest")
         .header("Referer", "https://accounts.google.com/o/oauth2/iframe")
         .header("cookie", cookie).checkStatus().toJson();
+    if (json.hasKey("error")) {
+      json.log();
+      throw new IllegalStateException(json.get("error"));
+    }
     return json.get("access_token");
   }
 
@@ -246,5 +250,6 @@ public class NestClient {
         .send("")
         .checkStatus().toJson();
   }
+
 
 }
